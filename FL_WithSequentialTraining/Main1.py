@@ -27,7 +27,7 @@ from ultralytics import YOLO
 # Import our new modular components  
 from core.aggregation import federated_average  
 from core.utils import adapt_and_save_initial_model  
-from core.oort.oort_wrapper import OortClientSampler   # <-- ĐẶT Ở ĐÂY, sau sys.path.insert
+from core.oort.oort_wrapper import OortClientSampler   # <-- �?T ? ��Y, sau sys.path.insert
 # --- Add project root to sys.path ---
 # This allows imports from core to work regardless of how the script is run.
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -119,11 +119,11 @@ def select_client_ids(round_num):
     return all_ids
 
 # === CONFIG LOADING ===
-def load_config(config_path='config.yaml'):
+def load_config(config_path='config1.yaml'):
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
-config = load_config(os.path.join(os.path.dirname(__file__), 'config.yaml'))
+config = load_config(os.path.join(os.path.dirname(__file__), 'config1.yaml'))
 
 NUM_ROUNDS = config.get('num_rounds', 3)
 EPOCHS_PER_ROUND = config.get('epochs_per_round', 10)
@@ -223,7 +223,7 @@ def train_clients(round_num):
     client_models_dir = os.path.join(FL_PROJECT_OUTPUTS_DIR, 'client_models')  
     os.makedirs(client_models_dir, exist_ok=True)  
   
-    # --- Chọn client theo phương pháp cấu hình (oort | random | all) ---  
+    # --- Ch?n client theo phuong ph�p c?u h�nh (oort | random | all) ---  
     selected_ids = select_client_ids(round_num)  
   
     for cid in selected_ids:  
@@ -258,7 +258,7 @@ def train_clients(round_num):
             logger.error(f"Client {client['model_name']} trained model not found at {best_pt_path}")  
             continue  
   
-        # --- Cập nhật Oort (chỉ khi dùng phương pháp oort) ---  
+        # --- C?p nh?t Oort (ch? khi d�ng phuong ph�p oort) ---  
         if SELECTION_METHOD == 'oort':  
             loss = read_loss_from_csv(client_run_dir)  
             oort.update_client(cid, loss=loss, duration=duration, round_num=round_num)  
@@ -297,7 +297,7 @@ def aggregate(weights_paths, round_num):
             base_model_for_aggregation.model.load_state_dict(avg_state_dict)
             next_global_model_path = os.path.join(GLOBAL_MODEL_SAVE_DIR, f'global_model_r{round_num + 1}.pt')
             base_model_for_aggregation.save(next_global_model_path)
-            logger.info(f"✅ Aggregated global model for Round {round_num + 1} saved to: {next_global_model_path}")
+            logger.info(f"? Aggregated global model for Round {round_num + 1} saved to: {next_global_model_path}")
         else:
             logger.error("Could not load state_dict, base_model_for_aggregation.model is not a valid module.")
     except Exception as e:
@@ -320,7 +320,7 @@ def main():
             aggregate(weights_paths, round_num)
         else:
             logger.warning(f"No client weights to aggregate for round {round_num + 1}. Skipping aggregation.")
-        logger.info(f"✅ Completed Round {round_num + 1}\n")
+        logger.info(f"? Completed Round {round_num + 1}\n")
 
 if __name__ == "__main__":
     main()

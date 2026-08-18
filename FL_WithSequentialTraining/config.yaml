@@ -1,17 +1,33 @@
-num_rounds: 6
-epochs_per_round: 15
+num_rounds: 25
+epochs_per_round: 5
+selection_method: oort      # oort | random | all  
+num_clients_per_round: 5  
+oort_start_round: 5         
+sample_seed: 233
 
-num_classes: 5
-class_names: ['class0','class1','class2','class3','class4']
+num_classes: 8
+class_names: ['Car', 'Van', 'Truck', 'Pedestrian', 'Person_sitting', 'Cyclist', 'Tram', 'Misc']
 
-fl_project_outputs_dir: FL_YOLOv8_Project_Outputs
+fl_project_outputs_dir: FL_YOLO26l_Project_Outputs_noniid_clean
 device: cuda
 clients:
   - model_name: client1
-    data_yaml: path to client1/data.yaml
+    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client1/data.yaml"
   - model_name: client2
-    data_yaml: path to client2/data.yaml
+    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client2/data.yaml"
   - model_name: client3
-    data_yaml: path to client3/data.yaml
+    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client3/data.yaml"
   - model_name: client4
-    data_yaml: path to client4/data.yaml
+    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client4/data.yaml"
+  - model_name: client5
+    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client5/data.yaml"
+  - model_name: client6
+    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client6/data.yaml"
+  - model_name: client7
+    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client7/data.yaml"
+  - model_name: client8
+    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client8/data.yaml"
+  - model_name: client9
+    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client9/data.yaml"
+  - model_name: client10
+    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client10/data.yaml"

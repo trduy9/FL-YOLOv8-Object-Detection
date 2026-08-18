@@ -1,0 +1,42 @@
+# Python
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+
+# Dataset
+Data/Dataset/
+
+# Model weights
+*.pt
+*.pth
+*.onnx
+
+# Training outputs
+runs/
+experiments/
+experiments_*/
+*_Project_Outputs_*/
+folder_evaluation/
+folder_experiments/
+log_train/
+log_val/
+
+# Logs
+*.log
+
+# Experiment logs
+*.log
+FL_WithSequentialTraining/log_val_*.txt
+# IDE
+.vscode/
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+

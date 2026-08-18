@@ -32,16 +32,83 @@ def copy_files(image_list, src_img_dir, src_lbl_dir, dst_img_dir, dst_lbl_dir):
         if os.path.exists(label_path):
             shutil.copy2(label_path, os.path.join(dst_lbl_dir, os.path.basename(label_path)))
 
-def write_data_yaml(client_dir, nc, names, rel_train, rel_val, rel_test):
-    data = {
-        'train': rel_train,
-        'val': rel_val,  
-        'test': rel_test,
-        'nc': nc,
-        'names': names
-    }
-    with open(os.path.join(client_dir, 'data.yaml'), 'w') as f:
+#def write_data_yaml(client_dir, nc, names, rel_train, rel_val, rel_test):
+#    data = {
+#        'train': rel_train,
+#        'val': rel_val,  
+#        'test': rel_test,
+#        'nc': nc,
+#        'names': names
+#    }
+#    with open(os.path.join(client_dir, 'data.yaml'), 'w') as f:
+#        yaml.dump(data, f)
+
+def write_data_yaml(client_dir, nc, names, rel_train, rel_val, rel_test=None):  
+    data = {'train': rel_train, 'val': rel_val, 'nc': nc, 'names': names}  
+    if rel_test is not None:  
+        data['test'] = rel_test  
+    with open(os.path.join(client_dir, 'data.yaml'), 'w') as f:  
         yaml.dump(data, f)
+
+
+def get_iid_splits(train_ids, nclients, train_label_path, class_map):  
+ 
+    random.seed(0)  
+  
+    image_labels = get_labels_from_kitti(train_label_path, class_map)  
+  
+ 
+    class_indices = defaultdict(list)  
+    for img_id in train_ids:  
+        label = image_labels.get(img_id)  
+        if label is None:  
+            continue  
+        class_indices[label].append(img_id)  
+  
+  
+    splits = {}  
+    for class_id, ids in class_indices.items():  
+        random.shuffle(ids)  
+        for i, img_id in enumerate(ids):  
+            splits[img_id] = f'client{i % nclients}'  
+  
+
+    print('\nData distribution (IID theo class):')  
+    counts = defaultdict(int)  
+    for c in splits.values():  
+        counts[c] += 1  
+    for i in range(nclients):  
+        print(f'Client {i}: {counts.get(f"client{i}", 0)} samples')  
+  
+    return splits
+
+def partition_iid_class(train_images, label_dir, num_clients, nc):  
+ 
+    class_to_imgs = defaultdict(list)  
+    for img_path in train_images:  
+        base = os.path.splitext(os.path.basename(img_path))[0]  
+        label_path = os.path.join(label_dir, base + '.txt')  
+        if not os.path.exists(label_path):  
+            continue  
+        with open(label_path, 'r') as f:  
+            counts = defaultdict(int)  
+            for line in f:  
+                parts = line.split()  
+                if parts:  
+                    counts[int(parts[0])] += 1  
+        if not counts:  
+            continue  
+        dominant = max(counts, key=counts.get)  
+        class_to_imgs[dominant].append(img_path)  
+  
+  
+    client_imgs = [[] for _ in range(num_clients)]  
+    for c in range(nc):  
+        imgs = class_to_imgs[c]  
+        random.shuffle(imgs)  
+        for i, img in enumerate(imgs):  
+            client_imgs[i % num_clients].append(img)  
+    return client_imgs
 
 def partition_iid(train_images, num_clients):
     random.shuffle(train_images)
@@ -131,56 +198,125 @@ def partition_non_iid_dirichlet(train_images, label_dir, num_clients, nc, alpha=
     for i in range(num_clients):
         client_imgs[i] = list(set(client_imgs[i]))
     return client_imgs
-
-def main():
-    args = parse_args()
-    # No random seed set; always random
-    # Load global data.yaml for class info
-    with open(os.path.join(args.dataset_root, 'data.yaml'), 'r') as f:
-        data_yaml = yaml.safe_load(f)
-    nc = data_yaml['nc']
-    names = data_yaml['names']
-    # Gather all train images
-    train_img_dir = os.path.join(args.dataset_root, 'train', 'images')
-    train_lbl_dir = os.path.join(args.dataset_root, 'train', 'labels')
-    train_images = [os.path.join(train_img_dir, f) for f in os.listdir(train_img_dir) if f.endswith(('.jpg', '.png', '.jpeg'))]
-    # Partition
-    if args.split_type == 'iid':
-        client_splits = partition_iid(train_images, args.num_clients)
-    elif args.split_type == 'non-iid-class':
-        client_splits = partition_non_iid_class(train_images, train_lbl_dir, args.num_clients, nc)
-    elif args.split_type == 'custom':
-        if args.custom_proportions:
-            with open(args.custom_proportions, 'r') as f:
-                proportions = yaml.safe_load(f)
-        else:
-            # Example: class 0 is 80% client0, 20% client1; class 1 is 20% client0, 80% client1
-            proportions = {str(c): [1/args.num_clients]*args.num_clients for c in range(nc)}
-        client_splits = partition_custom(train_images, train_lbl_dir, args.num_clients, nc, proportions)
-    elif args.split_type == 'non-iid-dirichlet':
-        client_splits = partition_non_iid_dirichlet(train_images, train_lbl_dir, args.num_clients, nc, alpha=args.dirichlet_alpha)
-    # Prepare output
-    os.makedirs(args.output_dir, exist_ok=True)
-    # Copy valid and test sets globally
-    valid_img_dir = os.path.join(args.dataset_root, 'valid', 'images')
-    valid_lbl_dir = os.path.join(args.dataset_root, 'valid', 'labels')
-    test_img_dir = os.path.join(args.dataset_root, 'test', 'images')
-    test_lbl_dir = os.path.join(args.dataset_root, 'test', 'labels')
-    for i, imgs in enumerate(client_splits):
-        client_dir = os.path.join(args.output_dir, f'client{i+1}')
-        train_img_out = os.path.join(client_dir, 'train', 'images')
-        train_lbl_out = os.path.join(client_dir, 'train', 'labels')
-        copy_files(imgs, train_img_dir, train_lbl_dir, train_img_out, train_lbl_out)
-        # Copy valid and test sets (global)
-        valid_img_out = os.path.join(client_dir, 'valid', 'images')
-        valid_lbl_out = os.path.join(client_dir, 'valid', 'labels')
-        test_img_out = os.path.join(client_dir, 'test', 'images')
-        test_lbl_out = os.path.join(client_dir, 'test', 'labels')
-        copy_files([os.path.join(valid_img_dir, f) for f in os.listdir(valid_img_dir) if f.endswith(('.jpg', '.png', '.jpeg'))], valid_img_dir, valid_lbl_dir, valid_img_out, valid_lbl_out)
-        copy_files([os.path.join(test_img_dir, f) for f in os.listdir(test_img_dir) if f.endswith(('.jpg', '.png', '.jpeg'))], test_img_dir, test_lbl_dir, test_img_out, test_lbl_out)
-        # Write data.yaml for client
-        write_data_yaml(client_dir, nc, names, 'train/images', 'valid/images', 'test/images')
+    
+def main():  
+    args = parse_args()  
+    with open(os.path.join(args.dataset_root, 'data.yaml'), 'r', encoding='utf-8') as f:  
+        data_yaml = yaml.safe_load(f)  
+    nc = data_yaml['nc']  
+    names = data_yaml['names']  
+  
+    train_img_dir = os.path.join(args.dataset_root, 'train', 'images')  
+    train_lbl_dir = os.path.join(args.dataset_root, 'train', 'labels')  
+    train_images = [os.path.join(train_img_dir, f) for f in os.listdir(train_img_dir) if f.endswith(('.jpg', '.png', '.jpeg'))]  
+  
+    if args.split_type == 'iid':  
+        client_splits = partition_iid_class(train_images, train_lbl_dir, args.num_clients, nc)
+    elif args.split_type == 'non-iid-class':  
+        client_splits = partition_non_iid_class(train_images, train_lbl_dir, args.num_clients, nc)  
+    elif args.split_type == 'custom':  
+        if args.custom_proportions:  
+            with open(args.custom_proportions, 'r') as f:  
+                proportions = yaml.safe_load(f)  
+        else:  
+            proportions = {str(c): [1/args.num_clients]*args.num_clients for c in range(nc)}  
+        client_splits = partition_custom(train_images, train_lbl_dir, args.num_clients, nc, proportions)  
+    elif args.split_type == 'non-iid-dirichlet':  
+        client_splits = partition_non_iid_dirichlet(train_images, train_lbl_dir, args.num_clients, nc, alpha=args.dirichlet_alpha)  
+  
+    os.makedirs(args.output_dir, exist_ok=True)  
+  
+    
+    valid_root = os.path.join(args.dataset_root, 'valid')  
+    if not os.path.isdir(valid_root):  
+        valid_root = os.path.join(args.dataset_root, 'val')  
+    if not os.path.isdir(valid_root):  
+        raise FileNotFoundError("Cant find 'valid/' or 'val/' trong dataset_root")  
+    valid_img_dir = os.path.join(valid_root, 'images')  
+    valid_lbl_dir = os.path.join(valid_root, 'labels')  
+  
+    
+    test_img_dir = os.path.join(args.dataset_root, 'test', 'images')  
+    test_lbl_dir = os.path.join(args.dataset_root, 'test', 'labels')  
+    has_test = os.path.isdir(test_img_dir)  
+  
+    for i, imgs in enumerate(client_splits):  
+        client_dir = os.path.join(args.output_dir, f'client{i+1}')  
+        copy_files(imgs, train_img_dir, train_lbl_dir,  
+                   os.path.join(client_dir, 'train', 'images'),  
+                   os.path.join(client_dir, 'train', 'labels'))  
+  
+        copy_files([os.path.join(valid_img_dir, f) for f in os.listdir(valid_img_dir)  
+                    if f.endswith(('.jpg', '.png', '.jpeg'))],  
+                   valid_img_dir, valid_lbl_dir,  
+                   os.path.join(client_dir, 'valid', 'images'),  
+                   os.path.join(client_dir, 'valid', 'labels'))  
+  
+        rel_test = None  
+        if has_test:  
+            copy_files([os.path.join(test_img_dir, f) for f in os.listdir(test_img_dir)  
+                        if f.endswith(('.jpg', '.png', '.jpeg'))],  
+                       test_img_dir, test_lbl_dir,  
+                       os.path.join(client_dir, 'test', 'images'),  
+                       os.path.join(client_dir, 'test', 'labels'))  
+            rel_test = 'test/images'  
+  
+        write_data_yaml(client_dir, nc, names, 'train/images', 'valid/images', rel_test)  
+  
     print(f"Partitioned data for {args.num_clients} clients in {args.output_dir}/")
+
+
+    
+#def main():
+#    args = parse_args()
+#    # No random seed set; always random
+#    # Load global data.yaml for class info
+#    with open(os.path.join(args.dataset_root, 'data.yaml'), 'r') as f:
+#        data_yaml = yaml.safe_load(f)
+#    nc = data_yaml['nc']
+#    names = data_yaml['names']
+#    # Gather all train images
+#    train_img_dir = os.path.join(args.dataset_root, 'train', 'images')
+#    train_lbl_dir = os.path.join(args.dataset_root, 'train', 'labels')
+#    train_images = [os.path.join(train_img_dir, f) for f in os.listdir(train_img_dir) if f.endswith(('.jpg', '.png', '.jpeg'))]
+#    # Partition
+#    if args.split_type == 'iid':
+##        client_splits = partition_iid(train_images, args.num_clients)
+#        client_splits = partition_iid_class(train_images, train_lbl_dir, args.num_clients, nc)
+#    elif args.split_type == 'non-iid-class':
+#        client_splits = partition_non_iid_class(train_images, train_lbl_dir, args.num_clients, nc)
+#    elif args.split_type == 'custom':
+#        if args.custom_proportions:
+#            with open(args.custom_proportions, 'r') as f:
+#                proportions = yaml.safe_load(f)
+#        else:
+#            # Example: class 0 is 80% client0, 20% client1; class 1 is 20% client0, 80% client1
+#            proportions = {str(c): [1/args.num_clients]*args.num_clients for c in range(nc)}
+#        client_splits = partition_custom(train_images, train_lbl_dir, args.num_clients, nc, proportions)
+#    elif args.split_type == 'non-iid-dirichlet':
+#        client_splits = partition_non_iid_dirichlet(train_images, train_lbl_dir, args.num_clients, nc, alpha=args.dirichlet_alpha)
+#    # Prepare output
+#    os.makedirs(args.output_dir, exist_ok=True)
+#    # Copy valid and test sets globally
+#    valid_img_dir = os.path.join(args.dataset_root, 'valid', 'images')
+#    valid_lbl_dir = os.path.join(args.dataset_root, 'valid', 'labels')
+#    test_img_dir = os.path.join(args.dataset_root, 'test', 'images')
+#    test_lbl_dir = os.path.join(args.dataset_root, 'test', 'labels')
+#    for i, imgs in enumerate(client_splits):
+#        client_dir = os.path.join(args.output_dir, f'client{i+1}')
+#        train_img_out = os.path.join(client_dir, 'train', 'images')
+#        train_lbl_out = os.path.join(client_dir, 'train', 'labels')
+#        copy_files(imgs, train_img_dir, train_lbl_dir, train_img_out, train_lbl_out)
+#        # Copy valid and test sets (global)
+#        valid_img_out = os.path.join(client_dir, 'valid', 'images')
+#        valid_lbl_out = os.path.join(client_dir, 'valid', 'labels')
+#        test_img_out = os.path.join(client_dir, 'test', 'images')
+#        test_lbl_out = os.path.join(client_dir, 'test', 'labels')
+#        copy_files([os.path.join(valid_img_dir, f) for f in os.listdir(valid_img_dir) if f.endswith(('.jpg', '.png', '.jpeg'))], valid_img_dir, valid_lbl_dir, valid_img_out, valid_lbl_out)
+#        copy_files([os.path.join(test_img_dir, f) for f in os.listdir(test_img_dir) if f.endswith(('.jpg', '.png', '.jpeg'))], test_img_dir, test_lbl_dir, test_img_out, test_lbl_out)
+#        # Write data.yaml for client
+#        write_data_yaml(client_dir, nc, names, 'train/images', 'valid/images', 'test/images')
+#    print(f"Partitioned data for {args.num_clients} clients in {args.output_dir}/")
 
 if __name__ == '__main__':
     main() 

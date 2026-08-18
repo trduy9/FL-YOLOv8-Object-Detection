@@ -41,12 +41,12 @@ def evaluate_model(model_path, validation_data_yaml, device, output_dir):
     try:
         results = model.val(
             data=validation_data_yaml,
-            imgsz=640,
-            batch=16,
+            imgsz=512,
+            batch=4,
             device=device,
             split='val',
-            conf=0,
-            iou=0,
+            conf=0.001,
+            iou=0.65,
             plots=True,
             project=output_dir,
             name=os.path.basename(model_path).replace('.pt', '')
