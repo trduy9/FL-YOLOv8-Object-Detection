@@ -30,7 +30,7 @@ class OortSelector:
         
         # System utility parameters
         self.round_threshold = args.get('round_threshold', 60)
-        self.round_penalty = args.get('round_penalty', 0.0)
+        self.round_penalty = args.get('round_penalty', 0.5)
         self.round_prefer_duration = float('inf')
         
         # Pacer mechanism parameters
@@ -44,7 +44,7 @@ class OortSelector:
         self.clip_bound = args.get('clip_bound', 0.95)
         
         # Blacklist parameters
-        self.blacklist_rounds = args.get('blacklist_rounds', 12)
+        self.blacklist_rounds = args.get('blacklist_rounds', 10)
         self.blacklist_max_len = args.get('blacklist_max_len', 0.3)
         self.blacklist = set()
         
@@ -134,8 +134,8 @@ class OortSelector:
                         cur_time,
                         clientId,
                         round(score_info['raw_reward'], 6),
-                        0.0,  # Chua có normalized reward
-                        0.0,  # Chua có exploration bonus
+                        0.0,  # Chua cï¿½ normalized reward
+                        0.0,  # Chua cï¿½ exploration bonus
                         round(score_info['system_penalty'], 6),
                         round(score_info['init_score'], 6),
                         round(score_info['duration'], 4),
@@ -151,7 +151,7 @@ class OortSelector:
                         is_selected
                     ])
         
-        # Luu vào memory d? có th? export format khác
+        # Luu vï¿½o memory d? cï¿½ th? export format khï¿½c
         self.round_utilities[cur_time] = {
             'exploit_scores': exploit_scores,
             'explore_scores': explore_scores,
@@ -402,10 +402,12 @@ class OortSelector:
                 numOfExploited += 1
                 
                 # UCB score: normalized reward + exploration bonus (temporal uncertainty)
-                normalized_reward = (creward - min_reward) / float(range_reward)
-                exploration_bonus = math.sqrt(
-                    0.1 * math.log(cur_time) / self.totalArms[key]['time_stamp']
-                )
+                normalized_reward = (creward - min_reward) / float(max(1e-4, range_reward))
+                t_stamp = self.totalArms[key]['time_stamp']
+                if cur_time > 1 and t_stamp > 0:
+                    exploration_bonus = math.sqrt(0.1 * math.log(cur_time) / float(t_stamp))
+                else:
+                    exploration_bonus = 0.0
                 sc = normalized_reward + exploration_bonus
                 
                 # Apply system utility penalty for slow clients
@@ -511,10 +513,12 @@ class OortSelector:
         for key in orderedKeys:
             if self.totalArms[key]['count'] > 0:
                 creward = min(self.totalArms[key]['reward'], clip_value)
-                normalized_reward = (creward - min_reward) / float(range_reward)
-                exploration_bonus = math.sqrt(
-                    0.1 * math.log(cur_time) / self.totalArms[key]['time_stamp']
-                ) if cur_time > 0 and self.totalArms[key]['time_stamp'] > 0 else 0
+                normalized_reward = (creward - min_reward) / float(max(1e-4, range_reward))
+                t_stamp = self.totalArms[key]['time_stamp']
+                if cur_time > 1 and t_stamp > 0:
+                    exploration_bonus = math.sqrt(0.1 * math.log(cur_time) / float(t_stamp))
+                else:
+                    exploration_bonus = 0.0 if cur_time > 0 and self.totalArms[key]['time_stamp'] > 0 else 0
                 
                 clientDuration = self.totalArms[key]['duration']
                 system_penalty = 1.0

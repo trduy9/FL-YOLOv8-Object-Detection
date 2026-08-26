@@ -131,6 +131,7 @@ NUM_CLASSES = config.get('num_classes')
 FL_PROJECT_OUTPUTS_DIR = config.get('fl_project_outputs_dir', 'FL_YOLOv8_Project_Outputs')
 CLIENTS = config.get('clients', [])
 DEVICE = config.get('device', 'cpu') # Get device from config
+USE_GAUSSIAN_LOSS = config.get('use_gaussian_loss', False)
 
 # --- Cau hinh chon client ---  
 SELECTION_METHOD = config.get('selection_method', 'all')   # oort | random | all  
@@ -237,8 +238,8 @@ def train_clients(round_num):
   
         t0 = time.time()  
         try:  
-            subprocess.run([  
-                'python', train_client_script_path,  
+            cmd = [  
+                sys.executable, train_client_script_path,  
                 '--data', client['data_yaml'],  
                 '--save', save_name,  
                 '--epochs', str(EPOCHS_PER_ROUND),  
@@ -246,7 +247,10 @@ def train_clients(round_num):
                 '--device', DEVICE,  
                 '--workers', str(NUM_WORKERS_FOR_CLIENT_DATALOADERS),  
                 '--output_dir', client_models_dir  
-            ], check=True)  
+            ]
+            if USE_GAUSSIAN_LOSS:
+                cmd.append('--use_gaussian_loss')
+            subprocess.run(cmd, check=True)  
         except subprocess.CalledProcessError as e:  
             logger.error(f"Training failed for client {client['model_name']}: {e}")  
             continue  

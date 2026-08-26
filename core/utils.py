@@ -28,7 +28,7 @@ def adapt_and_save_initial_model(num_classes, data_yaml_path, save_path, device=
 
     try:
         # Load the pre-trained model
-        model = YOLO("/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/yolo26l.pt")
+        model = YOLO("/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/yolo26m.pt")
         yolo_model = model.model
         if yolo_model is None or not hasattr(yolo_model, 'named_modules'):
             raise RuntimeError("YOLO model is not loaded correctly or does not have named_modules.")

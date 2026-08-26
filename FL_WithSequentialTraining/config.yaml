@@ -1,33 +1,34 @@
 num_rounds: 25
 epochs_per_round: 5
-selection_method: oort      # oort | random | all  
+selection_method: oort       # oort | random | all  
 num_clients_per_round: 5  
-oort_start_round: 5         
+oort_start_round: 5        
 sample_seed: 233
 
 num_classes: 8
 class_names: ['Car', 'Van', 'Truck', 'Pedestrian', 'Person_sitting', 'Cyclist', 'Tram', 'Misc']
 
-fl_project_outputs_dir: FL_YOLO26l_Project_Outputs_noniid_clean
+fl_project_outputs_dir: FL_YOLO26m_Project_Outputs_noniid_05exponential_5clients5noise_gaussian_loss_E2E_withCIoU_3
 device: cuda
+use_gaussian_loss: true
 clients:
   - model_name: client1
-    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client1/data.yaml"
+    data_yaml: /media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid_05exponential_5clients5noise/client1/data.yaml
   - model_name: client2
-    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client2/data.yaml"
+    data_yaml: /media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid_05exponential_5clients5noise/client2/data.yaml
   - model_name: client3
-    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client3/data.yaml"
+    data_yaml: /media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid_05exponential_5clients5noise/client3/data.yaml
   - model_name: client4
-    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client4/data.yaml"
+    data_yaml: /media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid_05exponential_5clients5noise/client4/data.yaml
   - model_name: client5
-    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client5/data.yaml"
+    data_yaml: /media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid_05exponential_5clients5noise/client5/data.yaml
   - model_name: client6
-    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client6/data.yaml"
+    data_yaml: /media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid_05exponential_5clients5noise/client6/data.yaml
   - model_name: client7
-    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client7/data.yaml"
+    data_yaml: /media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid_05exponential_5clients5noise/client7/data.yaml
   - model_name: client8
-    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client8/data.yaml"
+    data_yaml: /media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid_05exponential_5clients5noise/client8/data.yaml
   - model_name: client9
-    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client9/data.yaml"
+    data_yaml: /media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid_05exponential_5clients5noise/client9/data.yaml
   - model_name: client10
-    data_yaml: "/media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid/client10/data.yaml"
+    data_yaml: /media/data3/home/truongduy/FL-YOLOv8-Object-Detection/Data/Dataset/KITTI_10clients_noniid_05exponential_5clients5noise/client10/data.yaml

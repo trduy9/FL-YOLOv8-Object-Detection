@@ -5,6 +5,8 @@ env/
 __pycache__/
 *.py[cod]
 
+*.log
+
 # Dataset
 Data/Dataset/
 
@@ -38,5 +40,15 @@ FL_WithSequentialTraining/log_val_*.txt
 
 # OS
 .DS_Store
+
+# Experiment outputs
+FL_WithSequentialTraining/evauation_results_*/
+FL_WithSequentialTraining/experiments*/
+FL_WithSequentialTraining/runs/
+
+
+# CSV results
+*.csv
+
 
 
