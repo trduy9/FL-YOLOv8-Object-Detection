@@ -24,20 +24,10 @@ sys.path.insert(0, project_root)
   
 from ultralytics import YOLO  
   
-# Import our new modular components  
-from core.aggregation import federated_average  
+# Import modular components  
+from core.aggregation import federated_average, fedprox_aggregate  
 from core.utils import adapt_and_save_initial_model  
-from core.oort.oort_wrapper import OortClientSampler   # <-- ĐẶT Ở ĐÂY, sau sys.path.insert
-# --- Add project root to sys.path ---
-# This allows imports from core to work regardless of how the script is run.
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, project_root)
-
-from ultralytics import YOLO
-
-# Import our new modular components
-from core.aggregation import federated_average
-from core.utils import adapt_and_save_initial_model
+from core.oort.oort_wrapper import OortClientSampler
 
   
  
@@ -85,8 +75,22 @@ def read_loss_from_csv(client_run_dir):
     if not rows:  
         return 2.0  
     last = rows[-1]  
-    keys = ('train/box_loss', 'train/cls_loss', 'train/dfl_loss')  
-    return sum(float(last[k.strip()]) for k in last if k.strip() in keys) or 2.0  
+    
+    try:
+        box_loss = float(last.get('train/box_loss', 0.0) or 0.0)
+        cls_loss = float(last.get('train/cls_loss', 0.0) or 0.0)
+        dfl_loss = float(last.get('train/dfl_loss', 0.0) or 0.0)
+        
+        # When Gaussian loss is used, dfl_loss represents Gaussian NLL which can be negative (ln(sigma) < 0).
+        # Oort statistical utility requires a non-negative loss (loss >= 0) to compute sqrt(loss).
+        if dfl_loss < 0:
+            total_loss = box_loss + cls_loss
+        else:
+            total_loss = box_loss + cls_loss + dfl_loss
+            
+        return max(total_loss, 1e-4)
+    except Exception:
+        return 2.0  
   
 
   
@@ -132,6 +136,11 @@ FL_PROJECT_OUTPUTS_DIR = config.get('fl_project_outputs_dir', 'FL_YOLOv8_Project
 CLIENTS = config.get('clients', [])
 DEVICE = config.get('device', 'cpu') # Get device from config
 USE_GAUSSIAN_LOSS = config.get('use_gaussian_loss', False)
+GAUSSIAN_LOSS_TYPE = config.get('gaussian_loss_type', 'ciou')
+
+# --- Federated Learning Algorithm (fedavg | fedprox) ---
+FL_ALGORITHM = str(config.get('fl_algorithm', config.get('aggregation_method', 'fedavg'))).lower().strip()
+FEDPROX_MU = float(config.get('fedprox_mu', 0.01))
 
 # --- Cau hinh chon client ---  
 SELECTION_METHOD = config.get('selection_method', 'all')   # oort | random | all  
@@ -214,8 +223,9 @@ else:
 
 
 def train_clients(round_num):  
-    logger.info(f"=== Training Round {round_num + 1} ===")  
+    logger.info(f"=== Training Round {round_num + 1} ({FL_ALGORITHM.upper()}) ===")  
     weights_paths = []  
+    participating_client_ids = []
     current_global_model_path = os.path.join(GLOBAL_MODEL_SAVE_DIR, f'global_model_r{round_num}.pt')  
   
     # --- Path to the training script, robustly defined ---  
@@ -250,6 +260,10 @@ def train_clients(round_num):
             ]
             if USE_GAUSSIAN_LOSS:
                 cmd.append('--use_gaussian_loss')
+                if GAUSSIAN_LOSS_TYPE:
+                    cmd.extend(['--loss_type', str(GAUSSIAN_LOSS_TYPE)])
+            if FL_ALGORITHM == 'fedprox' and FEDPROX_MU > 0:
+                cmd.extend(['--fedprox_mu', str(FEDPROX_MU), '--global_weights', starting_weights])
             subprocess.run(cmd, check=True)  
         except subprocess.CalledProcessError as e:  
             logger.error(f"Training failed for client {client['model_name']}: {e}")  
@@ -269,11 +283,12 @@ def train_clients(round_num):
             logger.info(f"[Oort] Updated client {cid}: loss={loss:.4f}, duration={duration:.1f}s")  
   
         weights_paths.append(best_pt_path)  
+        participating_client_ids.append(cid)
   
-    return weights_paths
+    return weights_paths, participating_client_ids
 
-def aggregate(weights_paths, round_num):
-    logger.info(f"=== Aggregating Models for Round {round_num + 1} ===")
+def aggregate(weights_paths, participating_client_ids, round_num):
+    logger.info(f"=== Aggregating Models for Round {round_num + 1} ({FL_ALGORITHM.upper()}) ===")
     
     # 1. Load the state_dicts from client models
     client_state_dicts = []
@@ -291,8 +306,15 @@ def aggregate(weights_paths, round_num):
         logger.error("No state_dicts loaded, cannot aggregate.")
         return
 
-    # 2. Average the state_dicts using the core function
-    avg_state_dict = federated_average(client_state_dicts)
+    # 2. Average the state_dicts using the chosen FL algorithm
+    if FL_ALGORITHM == 'fedprox':
+        sample_counts = [count_images(id_to_client[cid]['data_yaml']) for cid in participating_client_ids]
+        client_names = [id_to_client[cid]['model_name'] for cid in participating_client_ids]
+        logger.info(f"⚡ [FedProx Aggregation] Weighting by samples: {dict(zip(client_names, sample_counts))}")
+        avg_state_dict = fedprox_aggregate(client_state_dicts, sample_counts=sample_counts)
+    else:
+        logger.info(f"⚡ [FedAvg Aggregation] Uniform averaging across {len(client_state_dicts)} clients")
+        avg_state_dict = federated_average(client_state_dicts)
 
     # 3. Create a new global model and load the averaged weights
     try:
@@ -308,6 +330,13 @@ def aggregate(weights_paths, round_num):
         logger.error(f"Failed to save aggregated global model: {e}")
 
 def main():
+    logger.info(f"🚀 Federated Learning Pipeline Initialized")
+    logger.info(f"   Algorithm: {FL_ALGORITHM.upper()}")
+    if FL_ALGORITHM == 'fedprox':
+        logger.info(f"   FedProx mu: {FEDPROX_MU} (Proximal regularization term enabled)")
+    else:
+        logger.info(f"   FedAvg: Standard federated averaging (mu = 0.0, uniform aggregation)")
+
     # --- Initial Model Adaptation ---
     adapt_and_save_initial_model(
         num_classes=NUM_CLASSES,
@@ -318,10 +347,10 @@ def main():
 
     # --- Federated Learning Rounds ---
     for round_num in range(NUM_ROUNDS):
-        logger.info(f"===== Federated Learning Round {round_num + 1}/{NUM_ROUNDS} =====")
-        weights_paths = train_clients(round_num)
+        logger.info(f"===== Federated Learning Round {round_num + 1}/{NUM_ROUNDS} [{FL_ALGORITHM.upper()}] =====")
+        weights_paths, participating_ids = train_clients(round_num)
         if weights_paths:
-            aggregate(weights_paths, round_num)
+            aggregate(weights_paths, participating_ids, round_num)
         else:
             logger.warning(f"No client weights to aggregate for round {round_num + 1}. Skipping aggregation.")
         logger.info(f"✅ Completed Round {round_num + 1}\n")

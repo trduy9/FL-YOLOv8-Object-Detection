@@ -20,6 +20,9 @@ runs/
 experiments/
 experiments_*/
 *_Project_Outputs_*/
+*_Project*_Outputs_*/
+*Project_KITTI_Outputs*/
+FL_WithSequentialTraining/FL_YOLO*
 folder_evaluation/
 folder_experiments/
 log_train/
@@ -31,6 +34,9 @@ log_val/
 # Experiment logs
 *.log
 FL_WithSequentialTraining/log_val_*.txt
+FL_WithSequentialTraining/log*.txt
+log_val_*.txt
+log*.txt
 # IDE
 .vscode/
 .idea/

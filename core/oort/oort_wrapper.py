@@ -123,7 +123,9 @@ class OortClientSampler:
         # Calculate reward (statistical utility)
         # Reward = sqrt(loss) * data_size (as in original Oort)
         data_size = self.client_info[client_id]['data_size']
-        reward = math.sqrt(loss) * data_size
+        # Guard against non-positive loss (e.g. Gaussian NLL loss where ln(sigma) < 0)
+        safe_loss = max(float(loss), 1e-4) if loss is not None else 1.0
+        reward = math.sqrt(safe_loss) * data_size
         
         # Normalize duration to minutes
         duration_minutes = duration
